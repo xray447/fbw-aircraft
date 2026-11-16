@@ -10,8 +10,8 @@ on:
 jobs:
   build_a32nx:
     name: Build and deploy A32NX
-    # Prevent running this on forks
-    if: github.repository_owner == 'flybywiresim'
+    # Cloudflare stuff is removed
+    if: github.repository_owner == 'xray447'
     runs-on: ubuntu-latest
     permissions:
       contents: write
