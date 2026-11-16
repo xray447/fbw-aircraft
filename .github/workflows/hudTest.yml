@@ -1,0 +1,122 @@
+# Build-script for the aircraft master branch
+# Builds the A32NX and uploads them to the GitHub Pre-Release Assets
+
+name: hudTest
+on:
+  push:
+    branches:
+      - hudTest
+
+jobs:
+  build_a32nx:
+    name: Build and deploy A32NX
+    # Prevent running this on forks
+    if: github.repository_owner == 'flybywiresim'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      FBW_PRODUCTION_BUILD: 1
+      PRE_RELEASE_TAG: assets/msfs2024/hudTest
+      PRE_RELEASE_ID: 313832813
+      STANDALONE_ZIP_NAME: A32NX-hudTest.7z
+      BUILD_DIR_NAME: hudTest-a32nx
+      AIRCRAFT_PROJECT_PREFIX: a32nx
+      AIRCRAFT_VARIANT: a320-251n
+    steps:
+      - name: Maximize build space
+        uses: AdityaGarg8/remove-unwanted-software@v4.1
+        with:
+          remove-android: 'true'
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-large-packages: 'true'
+          remove-cached-tools: 'true'
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set BUILT_DATE_TIME
+        run: echo "BUILT_DATE_TIME=$(date -u -Iseconds)" >> $GITHUB_ENV
+      - name: Create .env file
+        run: |
+          echo FBW_PRODUCTION_BUILD=1 >> fbw-a32nx/.env
+          echo CLIENT_ID=\"${{ secrets.NAVIGRAPH_CLIENT_ID }}\" >> fbw-a32nx/.env
+          echo CLIENT_SECRET=\"${{ secrets.NAVIGRAPH_CLIENT_SECRET }}\" >> fbw-a32nx/.env
+          echo CHARTFOX_SECRET=\"${{ secrets.CHARTFOX_SECRET }}\" >> fbw-a32nx/.env
+          echo SENTRY_DSN=\"${{ secrets.SENTRY_DSN }}\" >> fbw-a32nx/.env
+          echo AIRCRAFT_PROJECT_PREFIX=${{ env.AIRCRAFT_PROJECT_PREFIX }} >> fbw-a32nx/.env
+          echo AIRCRAFT_VARIANT=${{ env.AIRCRAFT_VARIANT }} >> fbw-a32nx/.env
+          echo BUILD_DIR_NAME=${{ env.BUILD_DIR_NAME }} >> .env
+          echo LOCALAZY_READ_KEY=${{ secrets.LOCALAZY_READ_KEY }} >> .env
+          echo VITE_BUILD=false >> .env
+      - name: Install dependencies
+        run: |
+          ./scripts/dev-env/run.sh ./scripts/setup.sh --clean
+          sudo apt-get update
+          sudo apt-get install -y rclone
+      - name: Build A32NX
+        run: |
+          ./scripts/dev-env/run.sh ./scripts/build.sh -r "a32nx" --no-tty -j 4
+          docker system prune -af
+      - name: Remove source files
+        run: |
+          rm -rf fbw-a32nx/src
+          rm -rf ./fbw-a380x/
+          rm -rf ./large-files/fbw-a380x/
+          rm -rf ./fbw-common/
+          rm -rf ./.git/objects/
+          rm -rf ./.git/modules/aircraft-large-files/objects/
+      - name: Build Fragmenter modules
+        run: |
+          df -h
+          node ./scripts/fragment_a32nx.js
+          cp ./fbw-a32nx/out/build-modules/modules.json ./fbw-a32nx/out/flybywire-aircraft-a320-neo/install.json
+          node ./scripts/install-source_a32nx.js
+          df -h
+      - name: Build Standalone Download files
+        run: |
+          mkdir ./${{ env.BUILD_DIR_NAME }}
+          cd ./fbw-a32nx/out/
+          rm -rf build-modules
+          7z a -t7z -m0=lzma2 -mx=7 -v2047m ../../${{ env.BUILD_DIR_NAME }}/${{ env.STANDALONE_ZIP_NAME }} ./flybywire-aircraft-a320-neo/
+          cd ../../
+          if [ "$(ls -1 ./${{ env.BUILD_DIR_NAME }} | wc -l)" -eq 1 ]; then
+            mv ./${{ env.BUILD_DIR_NAME }}/${{ env.STANDALONE_ZIP_NAME }}.001 ./${{ env.BUILD_DIR_NAME }}/${{ env.STANDALONE_ZIP_NAME }} # Only applicable if split in 1 part!
+          fi
+          df -h
+      - name: Count Standalone Download files
+        run: |
+          if [ "$(ls -1 ./${{ env.BUILD_DIR_NAME }} | wc -l)" -eq 1 ]; then
+            echo "Standalone Download is is not split"
+          else
+            ls -1 ./${{ env.BUILD_DIR_NAME }}| wc -l
+            echo "Error: The number of standalone download parts is not 1. Adjust all download references and workflows for the new number of parts!" >&2
+            exit 1
+          fi
+      - name: Delete old GitHub Pre-Release assets
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ github.token }}
+          tag: ${{ env.PRE_RELEASE_TAG }}
+          assets: "${{ env.STANDALONE_ZIP_NAME }}"
+          fail-if-no-assets: false
+      - name: Upload aircraft package to GitHub Pre-Release Assets
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: https://uploads.github.com/repos/${{ github.repository }}/releases/${{ env.PRE_RELEASE_ID }}/assets{?name,label}
+          asset_path: ./${{ env.BUILD_DIR_NAME }}/${{ env.STANDALONE_ZIP_NAME }}
+          asset_name: ${{ env.STANDALONE_ZIP_NAME }}
+          asset_content_type: application/zip
+      - name: Update GitHub Pre-Release Body
+        run: |
+          curl --request PATCH \
+            --url 'https://api.github.com/repos/${{ github.repository }}/releases/${{ env.PRE_RELEASE_ID }}' \
+            --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data-raw '{
+              "body": "This pre-release has its asset updated on every commit to the master branch\nLast updated on ${{ env.BUILT_DATE_TIME }} from commit ${{ github.sha }}\nThis link will always point to the latest master build: https://github.com/${{ github.repository }}/releases/download/${{ env.PRE_RELEASE_TAG }}/${{ env.STANDALONE_ZIP_NAME }}"
+            }'
