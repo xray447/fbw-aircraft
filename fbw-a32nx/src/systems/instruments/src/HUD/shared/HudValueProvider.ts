@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import { Instrument, ClockEvents, ConsumerSubject, MappedSubject, Publisher } from '@microsoft/msfs-sdk';
+import { Instrument, ClockEvents, ConsumerSubject, MappedSubject } from '@microsoft/msfs-sdk';
 import { getDisplayIndex } from '../HUD';
 import { HUDSimvars } from './HUDSimvarPublisher';
 import { HudMode, PitchscaleMode, HudElems } from '../HUDUtils';
@@ -12,41 +12,6 @@ import { Arinc429Values } from './ArincValueProvider';
 import { FcuBus } from './FcuBusProvider';
 
 export class HudValueProvider implements Instrument {
-  /**
-   * Topics published by this provider, in publication order. Published topics are diffed against the previously
-   * published value so that running at 60 Hz does not needlessly wake up every subscriber.
-   */
-  private static readonly publishedTopics: (keyof HudElems)[] = [
-    'cWndMode',
-    'decMode',
-    'hudFlightPhaseMode',
-    'spdTape',
-    'xWindSpdTape',
-    'altTape',
-    'xWindAltTape',
-    'attitudeIndicator',
-    'FMA',
-    'headingTrk',
-    'gndAcftRef',
-    'inAirAcftRef',
-    'flightPathDirector',
-    'flightPathVector',
-    'VSI',
-    'ra',
-    'IlsGS',
-    'IlsLoc',
-    'IlsHorizonTrk',
-    'syntheticRunwway',
-    'windIndicator',
-    'QFE',
-    'metricAlt',
-    'pitchScaleMode',
-    'gndSpeed',
-    'spdChevrons',
-  ];
-
-  private readonly lastPublishedValues = new Map<keyof HudElems, HudElems[keyof HudElems]>();
-
   private lastPublishedHudMode = -1;
 
   private flightPhase = 0;
@@ -530,10 +495,35 @@ export class HudValueProvider implements Instrument {
           }
         }
 
-        //console.log(this.logCase);
-        for (const topic of HudValueProvider.publishedTopics) {
-          this.publishIfChanged(publisher, topic);
-        }
+        // Publish unconditionally: every consumer uses whenChanged() so unchanged values cost nothing more than a
+        // comparison, while a HUD tree that was (re)created after the last change still picks up the current state.
+        publisher.pub('cWndMode', this.elems.cWndMode, false, false);
+        publisher.pub('decMode', this.elems.decMode, false, false);
+        publisher.pub('hudFlightPhaseMode', this.elems.hudFlightPhaseMode, false, false);
+
+        publisher.pub('spdTape', this.elems.spdTape, false, false);
+        publisher.pub('xWindSpdTape', this.elems.xWindSpdTape, false, false);
+        publisher.pub('altTape', this.elems.altTape, false, false);
+        publisher.pub('xWindAltTape', this.elems.xWindAltTape, false, false);
+        publisher.pub('attitudeIndicator', this.elems.attitudeIndicator, false, false);
+        publisher.pub('FMA', this.elems.FMA, false, false);
+        publisher.pub('headingTrk', this.elems.headingTrk, false, false);
+        publisher.pub('gndAcftRef', this.elems.gndAcftRef, false, false);
+        publisher.pub('inAirAcftRef', this.elems.inAirAcftRef, false, false);
+        publisher.pub('flightPathDirector', this.elems.flightPathDirector, false, false);
+        publisher.pub('flightPathVector', this.elems.flightPathVector, false, false);
+        publisher.pub('VSI', this.elems.VSI, false, false);
+        publisher.pub('ra', this.elems.ra, false, false);
+        publisher.pub('IlsGS', this.elems.IlsGS, false, false);
+        publisher.pub('IlsLoc', this.elems.IlsLoc, false, false);
+        publisher.pub('IlsHorizonTrk', this.elems.IlsHorizonTrk, false, false);
+        publisher.pub('syntheticRunwway', this.elems.syntheticRunwway, false, false);
+        publisher.pub('windIndicator', this.elems.windIndicator, false, false);
+        publisher.pub('QFE', this.elems.QFE, false, false);
+        publisher.pub('metricAlt', this.elems.metricAlt, false, false);
+        publisher.pub('pitchScaleMode', this.elems.pitchScaleMode, false, false);
+        publisher.pub('gndSpeed', this.elems.gndSpeed, false, false);
+        publisher.pub('spdChevrons', this.elems.spdChevrons, false, false);
       });
 
     this.sub.on('fmgcFlightPhase').handle((fp) => {
@@ -563,15 +553,6 @@ export class HudValueProvider implements Instrument {
 
       this.setCrossWindMode(this.crosswindMode);
     });
-  }
-
-  private publishIfChanged<K extends keyof HudElems>(publisher: Publisher<HudElems>, topic: K): void {
-    const value = this.elems[topic];
-    if (this.lastPublishedValues.get(topic) === value) {
-      return;
-    }
-    this.lastPublishedValues.set(topic, value);
-    publisher.pub(topic, value, false, false);
   }
 
   private setCrossWindMode(value: boolean) {

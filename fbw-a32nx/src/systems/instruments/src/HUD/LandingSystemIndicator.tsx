@@ -41,9 +41,9 @@ export class LandingSystem extends DisplayComponent<{ bus: ArincEventBus; instru
   private groupVis = false;
   private hudFlightPhaseMode = 0;
 
-  private readonly ls1Button = ConsumerSubject.create(this.sub.on('ls1Button'), false);
-  private readonly ls2Button = ConsumerSubject.create(this.sub.on('ls2Button'), false);
-  private readonly lsGrp = ConsumerSubject.create(this.sub.on('IlsLoc'), '');
+  private readonly ls1Button = ConsumerSubject.create(this.sub.on('ls1Button').whenChanged(), false);
+  private readonly ls2Button = ConsumerSubject.create(this.sub.on('ls2Button').whenChanged(), false);
+  private readonly lsGrp = ConsumerSubject.create(this.sub.on('IlsLoc').whenChanged(), '');
   private readonly isLsGrpVisible = MappedSubject.create(
     ([ls1Btn, ls2Btn, lsGrp]) => {
       const isCaptainSide = getDisplayIndex() === 1;
@@ -210,7 +210,7 @@ class LandingSystemInfo extends DisplayComponent<LandingSystemInfoProps> {
 
     this.dmeDistance.setConsumer(sub.on('dme'));
 
-    this.infoGrpVis.setConsumer(sub.on('IlsGS'));
+    this.infoGrpVis.setConsumer(sub.on('IlsGS').whenChanged());
 
     this.pausable.push(
       sub
@@ -368,9 +368,9 @@ class LocalizerIndicator extends DisplayComponent<{ bus: ArincEventBus; instrume
   private readonly isLocDiamondHidden = this.dots.map((v) => v < -2 || v > 2);
   private LSLocRef = FSComponent.createRef<SVGGElement>();
 
-  private readonly declutterMode = ConsumerSubject.create(this.sub.on('decMode'), -1);
-  private readonly Ls1State = ConsumerSubject.create(this.sub.on('ls1Button'), false);
-  private readonly Ls2State = ConsumerSubject.create(this.sub.on('ls2Button'), false);
+  private readonly declutterMode = ConsumerSubject.create(this.sub.on('decMode').whenChanged(), -1);
+  private readonly Ls1State = ConsumerSubject.create(this.sub.on('ls1Button').whenChanged(), false);
+  private readonly Ls2State = ConsumerSubject.create(this.sub.on('ls2Button').whenChanged(), false);
   private readonly onGround = ConsumerSubject.create(this.sub.on('leftMainGearCompressed'), true);
 
   private readonly groupVis = Subject.create('');

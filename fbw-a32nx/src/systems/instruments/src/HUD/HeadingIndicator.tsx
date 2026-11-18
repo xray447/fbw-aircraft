@@ -222,7 +222,7 @@ class GroundTrackBug extends DisplayComponent<GroundTrackBugProps> {
     Arinc429Values & DmcLogicEvents & HUDSimvars & ClockEvents & HudElems
   >();
   private readonly groundTrack = Arinc429ConsumerSubject.create(this.sub.on('track'));
-  private readonly headingTrk = ConsumerSubject.create(this.sub.on('headingTrk'), '');
+  private readonly headingTrk = ConsumerSubject.create(this.sub.on('headingTrk').whenChanged(), '');
   private readonly fpa = Arinc429ConsumerSubject.create(this.sub.on('fpa'));
 
   private isVisibleSub = MappedSubject.create(

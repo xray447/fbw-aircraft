@@ -232,7 +232,7 @@ export class TotalFlightPathAngle extends DisplayComponent<{ bus: ArincEventBus 
   private readonly flightPathVector = ConsumerSubject.create(this.sub.on('flightPathVector').whenChanged(), '');
   private readonly totalFpa = ConsumerSubject.create(this.sub.on('fac1GammaT'), new Arinc429Word(0));
 
-  private readonly spdChevronsVis = ConsumerSubject.create(this.sub.on('spdChevrons'), 'block');
+  private readonly spdChevronsVis = ConsumerSubject.create(this.sub.on('spdChevrons').whenChanged(), 'block');
   private readonly crosswindMode = ConsumerSubject.create(
     this.sub.on(getDisplayIndex() === 1 ? 'crosswindModeL' : 'crosswindModeR'),
     false,

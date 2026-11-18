@@ -65,8 +65,8 @@ export class LinearDeviationIndicator extends DisplayComponent<LinearDeviationIn
   }
 
   private readonly sub = this.props.bus.getSubscriber<Arinc429Values & FmsVars & HEvent & HUDSimvars & HudElems>();
-  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), '');
-  private readonly xwindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), '');
+  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), 'block');
+  private readonly xwindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), 'none');
   private readonly crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode').whenChanged(), false);
   private c = 0;
   private readonly isVisible = MappedSubject.create(

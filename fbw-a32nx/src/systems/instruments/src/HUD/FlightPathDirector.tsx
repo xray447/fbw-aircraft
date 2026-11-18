@@ -78,7 +78,7 @@ export class FlightPathDirector extends DisplayComponent<{
 
   private readonly flightPathDirector = ConsumerSubject.create(this.sub.on('flightPathDirector').whenChanged(), '');
   private readonly flightPase = ConsumerSubject.create(this.sub.on('fmgcFlightPhase').whenChanged(), 0);
-  private readonly crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode'), false);
+  private readonly crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode').whenChanged(), false);
 
   private readonly roll = Arinc429ConsumerSubject.create(this.sub.on('rollAr'));
   private readonly pitch = Arinc429ConsumerSubject.create(this.sub.on('pitchAr'));

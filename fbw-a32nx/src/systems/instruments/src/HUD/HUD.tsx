@@ -94,10 +94,10 @@ export class HUDComponent extends DisplayComponent<HUDProps> {
   private brightness = Subject.create(1);
 
   private readonly displayPowered = ConsumerSubject.create(this.sub.on(this.isCaptainSide ? 'elec' : 'elecFo'), true);
-  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), '');
-  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), '');
-  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), '');
-  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), '');
+  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), 'block');
+  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), 'none');
+  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), 'block');
+  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), 'none');
   private readonly windIndicator = ConsumerSubject.create(this.sub.on('windIndicator').whenChanged(), '');
   private readonly potentiometerPos = ConsumerSubject.create(
     this.sub.on(this.isCaptainSide ? 'hudPotentiometerCaptain' : 'hudPotentiometerFo').whenChanged(),

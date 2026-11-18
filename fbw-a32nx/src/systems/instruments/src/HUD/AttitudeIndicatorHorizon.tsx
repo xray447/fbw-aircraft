@@ -69,7 +69,7 @@ export class Horizon extends DisplayComponent<HorizonProps> {
 
   private GroupRef = FSComponent.createRef<SVGGElement>();
 
-  private crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode'), false);
+  private crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode').whenChanged(), false);
 
   private pitch = ConsumerSubject.create(this.sub.on('pitchAr'), null);
 

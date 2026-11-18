@@ -231,10 +231,13 @@ export class FMA extends DisplayComponent<{ bus: ArincEventBus; isAttExcessive: 
 
     this.BC3Message.sub(() => this.handleFMABorders());
 
-    sub.on('FMA').handle((v) => {
-      this.FMA = v;
-      this.FMARef.instance.style.display = `${this.FMA}`;
-    });
+    sub
+      .on('FMA')
+      .whenChanged()
+      .handle((v) => {
+        this.FMA = v;
+        this.FMARef.instance.style.display = `${this.FMA}`;
+      });
 
     sub
       .on('leftMainGearCompressed')

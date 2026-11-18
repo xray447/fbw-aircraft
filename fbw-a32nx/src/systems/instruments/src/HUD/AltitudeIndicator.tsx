@@ -232,8 +232,8 @@ export class AltitudeIndicator extends DisplayComponent<AltitudeIndicatorProps> 
   );
 
   private readonly cWndMode = ConsumerSubject.create(this.sub.on('cWndMode').whenChanged(), false);
-  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), '');
-  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), '');
+  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), 'block');
+  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), 'none');
   private readonly isTapeVisible = MappedSubject.create(
     ([alt, xwndAlt, altitude]) => {
       if (altitude.isNormalOperation()) {
@@ -346,8 +346,8 @@ export class AltitudeIndicatorOfftape extends DisplayComponent<AltitudeIndicator
 
   private targetAltitudeColor = Subject.create<TargetAltitudeColor>(TargetAltitudeColor.Cyan);
 
-  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), '');
-  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), '');
+  private readonly altTape = ConsumerSubject.create(this.sub.on('altTape').whenChanged(), 'block');
+  private readonly xWindAltTape = ConsumerSubject.create(this.sub.on('xWindAltTape').whenChanged(), 'none');
 
   onAfterRender(node: VNode): void {
     super.onAfterRender(node);

@@ -241,8 +241,8 @@ class AirspeedIndicatorBase extends DisplayComponent<AirspeedIndicatorProps> {
     this.pathSub.set(`m80.882 161.865v${length}`);
   }
 
-  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), '');
-  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), '');
+  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), 'block');
+  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), 'none');
   private readonly decMode = ConsumerSubject.create(this.sub.on('decMode').whenChanged(), 0);
   private readonly crosswindMode = ConsumerSubject.create(this.sub.on('cWndMode').whenChanged(), false);
   private readonly gndSpeed = ConsumerSubject.create(this.sub.on('gndSpeed').whenChanged(), false);
@@ -624,8 +624,8 @@ export class AirspeedIndicatorOfftape extends DisplayComponent<{ bus: ArincEvent
     }
   }
 
-  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), '');
-  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), '');
+  private readonly spdTape = ConsumerSubject.create(this.sub.on('spdTape').whenChanged(), 'block');
+  private readonly xWindSpdTape = ConsumerSubject.create(this.sub.on('xWindSpdTape').whenChanged(), 'none');
 
   onAfterRender(node: VNode): void {
     super.onAfterRender(node);
@@ -2015,7 +2015,7 @@ class GroundSpeedIndicator extends DisplayComponent<{ bus: EventBus }> {
 
   private readonly trueAirSpeedRegister = Arinc429RegisterSubject.createEmpty();
 
-  private readonly gndSpeed = ConsumerSubject.create(this.sub.on('gndSpeed'), false);
+  private readonly gndSpeed = ConsumerSubject.create(this.sub.on('gndSpeed').whenChanged(), false);
   private readonly isVisible = MappedSubject.create(([gndSpeed]) => {
     return gndSpeed ? 'block' : 'none';
   }, this.gndSpeed);
