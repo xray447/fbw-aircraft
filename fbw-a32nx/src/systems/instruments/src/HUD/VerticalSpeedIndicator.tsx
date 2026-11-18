@@ -40,6 +40,10 @@ export class VerticalSpeedIndicator extends DisplayComponent<VerticalSpeedIndica
 
   private filteredRadioAltitude = 0;
 
+  private lastVsFailedVisible: boolean | undefined = undefined;
+
+  private lastVsNormalVisible: boolean | undefined = undefined;
+
   private handlePos() {
     if (this.crosswindMode) {
       // transform="translate(475 135)
@@ -84,14 +88,16 @@ export class VerticalSpeedIndicator extends DisplayComponent<VerticalSpeedIndica
         const filteredVS = this.lagFilter.step(vs.value, this.props.instrument.deltaTime / 1000);
 
         const absVSpeed = Math.abs(filteredVS);
-        if (!vs.isNormalOperation()) {
-          this.vsFailed.instance.style.visibility = 'visible';
-          this.vsNormal.instance.style.visibility = 'hidden';
-        } else {
-          this.vsFailed.instance.style.visibility = 'hidden';
-          absVSpeed > 50
-            ? (this.vsNormal.instance.style.visibility = 'visible')
-            : (this.vsNormal.instance.style.visibility = 'hidden');
+        const vsFailedVisible = !vs.isNormalOperation();
+        const vsNormalVisible = vs.isNormalOperation() && absVSpeed > 50;
+
+        if (this.lastVsFailedVisible !== vsFailedVisible) {
+          this.lastVsFailedVisible = vsFailedVisible;
+          this.vsFailed.instance.style.visibility = vsFailedVisible ? 'visible' : 'hidden';
+        }
+        if (this.lastVsNormalVisible !== vsNormalVisible) {
+          this.lastVsNormalVisible = vsNormalVisible;
+          this.vsNormal.instance.style.visibility = vsNormalVisible ? 'visible' : 'hidden';
         }
 
         const sign = Math.sign(filteredVS);
@@ -186,6 +192,12 @@ class VSpeedText extends DisplayComponent<{
 
   private groupRef = FSComponent.createRef<SVGGElement>();
 
+  private lastVisibility = '';
+
+  private lastTransform = '';
+
+  private lastText = '';
+
   onAfterRender(node: VNode): void {
     super.onAfterRender(node);
 
@@ -195,10 +207,10 @@ class VSpeedText extends DisplayComponent<{
       const absVSpeed = Math.abs(vs.value);
 
       if (absVSpeed < 200) {
-        this.groupRef.instance.setAttribute('visibility', 'hidden');
+        this.setVisibility('hidden');
         return;
       }
-      this.groupRef.instance.setAttribute('visibility', 'visible');
+      this.setVisibility('visible');
 
       const sign = Math.sign(vs.value);
 
@@ -208,14 +220,30 @@ class VSpeedText extends DisplayComponent<{
       const minusSign = sign > 0 ? '' : '-';
 
       const text = minusSign + (Math.round(absVSpeed / 100) < 10 ? '0' : '') + Math.round(absVSpeed / 100).toString();
-      this.vsTextRef.instance.textContent = text;
-      this.groupRef.instance.setAttribute('transform', `translate(${textOffsetX} ${textOffset})`);
+      if (this.lastText !== text) {
+        this.lastText = text;
+        this.vsTextRef.instance.textContent = text;
+      }
+
+      const transform = `translate(${textOffsetX} ${textOffset})`;
+      if (this.lastTransform !== transform) {
+        this.lastTransform = transform;
+        this.groupRef.instance.setAttribute('transform', transform);
+      }
     });
 
     this.props.textColour.sub((colour) => {
       const className = `FontSmallest MiddleAlign ${colour}`;
       this.vsTextRef.instance.setAttribute('class', className);
     }, true);
+  }
+
+  private setVisibility(visibility: string): void {
+    if (this.lastVisibility === visibility) {
+      return;
+    }
+    this.lastVisibility = visibility;
+    this.groupRef.instance.setAttribute('visibility', visibility);
   }
 
   render(): VNode {

@@ -22,6 +22,17 @@ export class VerticalTape extends DisplayComponent<VerticalTapeProps> {
   private readonly sub = this.props.bus.getArincSubscriber<HudElems>();
   private tickRefs: NodeReference<SVGGElement>[] = [];
   private crosswindMode = false;
+
+  /** Cached element references per graduation: querying the DOM on every update allocates a live HTMLCollection. */
+  private readonly tickElements: { group: SVGGElement; path: SVGPathElement; text: SVGTextElement }[] = [];
+
+  private readonly tickOffsets: number[] = [];
+
+  private readonly tickPathHidden: boolean[] = [];
+
+  private readonly tickTextHidden: boolean[] = [];
+
+  private lastTapeOffset = Number.NaN;
   private buildSpeedGraduationPoints(): NodeReference<SVGGElement>[] {
     const numTicks = Math.round((this.props.displayRange * 2) / this.props.valueSpacing);
 
@@ -92,7 +103,7 @@ export class VerticalTape extends DisplayComponent<VerticalTapeProps> {
           const tickRef = FSComponent.createRef<SVGGElement>();
 
           graduationPoints.push(
-            <g ref={tickRef} style={`transform: translate3d(0px, ${offset}px, 0px`}>
+            <g ref={tickRef} style={`transform: translate3d(0px, ${offset}px, 0px)`}>
               <path class="NormalStroke Green" d="m556.112 343.481h-8.562" />
               <text class="FontMedium MiddleAlign Green" x="524" y="351">
                 {text}
@@ -108,6 +119,17 @@ export class VerticalTape extends DisplayComponent<VerticalTapeProps> {
 
   onAfterRender(node: VNode): void {
     super.onAfterRender(node);
+
+    // Resolve the path/text elements once instead of walking the subtree on every single update.
+    for (const ref of this.tickRefs) {
+      const group = ref.instance;
+      this.tickElements.push({
+        group,
+        path: group.getElementsByTagName('path')[0],
+        text: group.getElementsByTagName('text')[0],
+      });
+    }
+
     this.sub
       .on('cWndMode')
       .whenChanged()
@@ -130,59 +152,65 @@ export class VerticalTape extends DisplayComponent<VerticalTapeProps> {
       if (lowestValue < currentValueAtPrecision - this.props.displayRange) {
         lowestValue += this.props.valueSpacing;
       }
-      for (let i = 0; i < this.tickRefs.length; i++) {
+
+      for (let i = 0; i < this.tickElements.length; i++) {
         const elementValue = lowestValue + i * this.props.valueSpacing;
-        if (elementValue <= (this.props.upperLimit ?? Infinity)) {
-          const offset = (-elementValue * this.props.distanceSpacing) / this.props.valueSpacing;
-          const element = { elementValue, offset };
-          if (element) {
-            this.tickRefs[i].instance.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+        if (elementValue > (this.props.upperLimit ?? Infinity)) {
+          continue;
+        }
 
-            let text = '';
-            if (this.props.type === 'speed') {
-              if (elementValue % 20 === 0) {
-                text = Math.abs(elementValue).toString().padStart(3, '0');
-              }
+        const tick = this.tickElements[i];
+        const offset = (-elementValue * this.props.distanceSpacing) / this.props.valueSpacing;
 
-              if (newValue < 80) {
-                if (elementValue > newValue + this.props.displayRange) {
-                  this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.add('HiddenElement');
-                  this.tickRefs[i].instance.getElementsByTagName('text')[0].classList.add('HiddenElement');
-                } else {
-                  this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.remove('HiddenElement');
-                  this.tickRefs[i].instance.getElementsByTagName('text')[0].classList.remove('HiddenElement');
-                }
-              } else {
-                this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.remove('HiddenElement');
-                this.tickRefs[i].instance.getElementsByTagName('text')[0].classList.remove('HiddenElement');
-              }
-            } else if (this.props.type === 'altitude') {
-              if (elementValue % 500 === 0) {
-                text = (Math.abs(elementValue) / 100).toString().padStart(3, '0');
-                this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.remove('HiddenElement');
-              } else {
-                this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.add('HiddenElement');
-              }
+        if (this.tickOffsets[i] !== offset) {
+          this.tickOffsets[i] = offset;
+          tick.group.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+        }
 
-              if (this.crosswindMode) {
-                if (Math.abs(currentValueAtPrecision - elementValue) > 200) {
-                  this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.add('HiddenElement');
-                  this.tickRefs[i].instance.getElementsByTagName('text')[0].classList.add('HiddenElement');
-                }
-              } else {
-                this.tickRefs[i].instance.getElementsByTagName('path')[0].classList.remove('HiddenElement');
-                this.tickRefs[i].instance.getElementsByTagName('text')[0].classList.remove('HiddenElement');
-              }
-            }
+        let text = '';
+        let pathHidden = false;
+        let textHidden = false;
 
-            if (this.tickRefs[i].instance.getElementsByTagName('text')[0].textContent !== text) {
-              this.tickRefs[i].instance.getElementsByTagName('text')[0].textContent = text;
-            }
+        if (this.props.type === 'speed') {
+          if (elementValue % 20 === 0) {
+            text = Math.abs(elementValue).toString().padStart(3, '0');
+          }
+
+          pathHidden = newValue < 80 && elementValue > newValue + this.props.displayRange;
+          textHidden = pathHidden;
+        } else if (this.props.type === 'altitude') {
+          if (elementValue % 500 === 0) {
+            text = (Math.abs(elementValue) / 100).toString().padStart(3, '0');
+          }
+
+          if (this.crosswindMode) {
+            textHidden = Math.abs(currentValueAtPrecision - elementValue) > 200;
+            pathHidden = textHidden || elementValue % 500 !== 0;
           }
         }
+
+        this.setHidden(tick.path, pathHidden, this.tickPathHidden, i);
+        this.setHidden(tick.text, textHidden, this.tickTextHidden, i);
+
+        if (tick.text.textContent !== text) {
+          tick.text.textContent = text;
+        }
       }
-      this.refElement.instance.style.transform = `translate3d(0px, ${(clampedValue * this.props.distanceSpacing) / this.props.valueSpacing}px, 0px)`;
+
+      const tapeOffset = (clampedValue * this.props.distanceSpacing) / this.props.valueSpacing;
+      if (this.lastTapeOffset !== tapeOffset) {
+        this.lastTapeOffset = tapeOffset;
+        this.refElement.instance.style.transform = `translate3d(0px, ${tapeOffset}px, 0px)`;
+      }
     }, true);
+  }
+
+  private setHidden(element: SVGElement, hidden: boolean, cache: boolean[], index: number): void {
+    if (cache[index] === hidden) {
+      return;
+    }
+    cache[index] = hidden;
+    element.classList.toggle('HiddenElement', hidden);
   }
 
   render(): VNode {

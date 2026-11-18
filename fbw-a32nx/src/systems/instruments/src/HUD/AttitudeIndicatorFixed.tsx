@@ -482,10 +482,6 @@ class LocalizerIndicator extends DisplayComponent<{ bus: ArincEventBus; instrume
         this.lagFilter.reset();
       }
     });
-
-    this.pitch.sub(() => {
-      this.handleNavRadialError();
-    });
   }
 
   render(): VNode {
@@ -691,6 +687,8 @@ export class ReverserIndicator extends DisplayComponent<{ bus: ArincEventBus }> 
   private rev2TxtRef = FSComponent.createRef<SVGTextElement>();
   private rev1TxtRef = FSComponent.createRef<SVGTextElement>();
 
+  private lastReverseStateKey: string | undefined = undefined;
+
   private readonly eng2State = ConsumerSubject.create(this.sub.on('eng2State').whenChanged(), 0); // no rev failure implemented  using on/off state instead
   private readonly eng1State = ConsumerSubject.create(this.sub.on('eng1State').whenChanged(), 0); // no rev failure implemented  using on/off state instead
   private readonly rev1 = ConsumerSubject.create(this.sub.on('rev1').whenChanged(), 0);
@@ -800,6 +798,12 @@ export class ReverserIndicator extends DisplayComponent<{ bus: ArincEventBus }> 
       this.reverser3State,
     );
     this.sub.on('realTime').handle(() => {
+      const stateKey = `${this.reverser2State.get()}-${this.reverser3State.get()}`;
+      if (this.lastReverseStateKey === stateKey) {
+        return;
+      }
+      this.lastReverseStateKey = stateKey;
+
       if (this.reverser2State.get() !== 0 && this.reverser3State.get() !== 0) {
         this.revGroupRef.instance.style.display = 'block';
         this.setState();

@@ -345,6 +345,10 @@ class Drum extends DisplayComponent<DrumProperties> {
     this.gRef.instance.style.transform = `translate3d(0px, ${(position * this.props.distanceSpacing) / this.props.valueSpacing}px, 0px)`;
   }
 
+  private readonly digitOffsets: number[] = [];
+
+  private readonly digitColours: string[] = [];
+
   private updateValue() {
     let highestPosition =
       Math.round((this.position + this.props.displayRange) / this.props.valueSpacing) * this.props.valueSpacing;
@@ -367,13 +371,25 @@ class Drum extends DisplayComponent<DrumProperties> {
       }
 
       const text = this.props.getText(elementVal);
+      const digit = this.digitRefElements[i].instance;
 
-      this.digitRefElements[i].instance.setAttribute('transform', `translate(0 ${offset})`);
-      if (this.digitRefElements[i].instance.textContent !== text) {
-        this.digitRefElements[i].instance.textContent = text;
+      if (this.digitOffsets[i] !== offset) {
+        this.digitOffsets[i] = offset;
+        digit.setAttribute('transform', `translate(0 ${offset})`);
       }
-      this.digitRefElements[i].instance.classList.replace('Green', this.color);
-      this.digitRefElements[i].instance.classList.replace('Amber', this.color);
+
+      if (digit.textContent !== text) {
+        digit.textContent = text;
+      }
+
+      if (this.digitColours[i] !== this.color) {
+        this.digitColours[i] = this.color;
+        digit.classList.replace('Cyan', this.color);
+        digit.classList.replace('Magenta', this.color);
+        digit.classList.replace('White', this.color);
+        digit.classList.replace('Amber', this.color);
+        digit.classList.add(this.color);
+      }
     }
   }
 

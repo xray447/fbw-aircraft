@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import { Instrument, ClockEvents, ConsumerSubject, MappedSubject } from '@microsoft/msfs-sdk';
+import { Instrument, ClockEvents, ConsumerSubject, MappedSubject, Publisher } from '@microsoft/msfs-sdk';
 import { getDisplayIndex } from '../HUD';
 import { HUDSimvars } from './HUDSimvarPublisher';
 import { HudMode, PitchscaleMode, HudElems } from '../HUDUtils';
@@ -12,6 +12,43 @@ import { Arinc429Values } from './ArincValueProvider';
 import { FcuBus } from './FcuBusProvider';
 
 export class HudValueProvider implements Instrument {
+  /**
+   * Topics published by this provider, in publication order. Published topics are diffed against the previously
+   * published value so that running at 60 Hz does not needlessly wake up every subscriber.
+   */
+  private static readonly publishedTopics: (keyof HudElems)[] = [
+    'cWndMode',
+    'decMode',
+    'hudFlightPhaseMode',
+    'spdTape',
+    'xWindSpdTape',
+    'altTape',
+    'xWindAltTape',
+    'attitudeIndicator',
+    'FMA',
+    'headingTrk',
+    'gndAcftRef',
+    'inAirAcftRef',
+    'flightPathDirector',
+    'flightPathVector',
+    'VSI',
+    'ra',
+    'IlsGS',
+    'IlsLoc',
+    'IlsHorizonTrk',
+    'syntheticRunwway',
+    'windIndicator',
+    'QFE',
+    'metricAlt',
+    'pitchScaleMode',
+    'gndSpeed',
+    'spdChevrons',
+  ];
+
+  private readonly lastPublishedValues = new Map<keyof HudElems, HudElems[keyof HudElems]>();
+
+  private lastPublishedHudMode = -1;
+
   private flightPhase = 0;
   private declutterMode = 0;
   private crosswindMode = false;
@@ -86,10 +123,17 @@ export class HudValueProvider implements Instrument {
     });
     this.sub
       .on('realTime')
-      //.atFrequency(1) ///////////////
       .handle((_t) => {
-        SimVar.SetSimVarValue('L:A380X_HUDMODE', 'number', this.hudMode.get());
-        if (this.hudMode.get() === HudMode.TAXI) {
+        const hudMode = this.hudMode.get();
+
+        // Only write the simvar when the mode actually changes - a 60 Hz L:var write needlessly wakes up the
+        // sim side (and shows up as periodic spikes in the Coherent GT / manipulator threads).
+        if (hudMode !== this.lastPublishedHudMode) {
+          this.lastPublishedHudMode = hudMode;
+          SimVar.SetSimVarValue('L:A380X_HUDMODE', 'number', hudMode);
+        }
+
+        if (hudMode === HudMode.TAXI) {
           // hudmode  Taxi     flightpahse  notApp  xwind  ANY  dec  0
           if (this.declutterMode === 0) {
             this.elems.spdTape = 'block';
@@ -487,33 +531,9 @@ export class HudValueProvider implements Instrument {
         }
 
         //console.log(this.logCase);
-        publisher.pub('cWndMode', this.elems.cWndMode, false, false);
-        publisher.pub('decMode', this.elems.decMode, false, false);
-        publisher.pub('hudFlightPhaseMode', this.elems.hudFlightPhaseMode, false, false);
-
-        publisher.pub('spdTape', this.elems.spdTape, false, false);
-        publisher.pub('xWindSpdTape', this.elems.xWindSpdTape, false, false);
-        publisher.pub('altTape', this.elems.altTape, false, false);
-        publisher.pub('xWindAltTape', this.elems.xWindAltTape, false, false);
-        publisher.pub('attitudeIndicator', this.elems.attitudeIndicator, false, false);
-        publisher.pub('FMA', this.elems.FMA, false, false);
-        publisher.pub('headingTrk', this.elems.headingTrk, false, false);
-        publisher.pub('gndAcftRef', this.elems.gndAcftRef, false, false);
-        publisher.pub('inAirAcftRef', this.elems.inAirAcftRef, false, false);
-        publisher.pub('flightPathDirector', this.elems.flightPathDirector, false, false);
-        publisher.pub('flightPathVector', this.elems.flightPathVector, false, false);
-        publisher.pub('VSI', this.elems.VSI, false, false);
-        publisher.pub('ra', this.elems.ra, false, false);
-        publisher.pub('IlsGS', this.elems.IlsGS, false, false);
-        publisher.pub('IlsLoc', this.elems.IlsLoc, false, false);
-        publisher.pub('IlsHorizonTrk', this.elems.IlsHorizonTrk, false, false);
-        publisher.pub('syntheticRunwway', this.elems.syntheticRunwway, false, false);
-        publisher.pub('windIndicator', this.elems.windIndicator, false, false);
-        publisher.pub('QFE', this.elems.QFE, false, false);
-        publisher.pub('metricAlt', this.elems.metricAlt, false, false);
-        publisher.pub('pitchScaleMode', this.elems.pitchScaleMode, false, false);
-        publisher.pub('gndSpeed', this.elems.gndSpeed, false, false);
-        publisher.pub('spdChevrons', this.elems.spdChevrons, false, false);
+        for (const topic of HudValueProvider.publishedTopics) {
+          this.publishIfChanged(publisher, topic);
+        }
       });
 
     this.sub.on('fmgcFlightPhase').handle((fp) => {
@@ -543,6 +563,15 @@ export class HudValueProvider implements Instrument {
 
       this.setCrossWindMode(this.crosswindMode);
     });
+  }
+
+  private publishIfChanged<K extends keyof HudElems>(publisher: Publisher<HudElems>, topic: K): void {
+    const value = this.elems[topic];
+    if (this.lastPublishedValues.get(topic) === value) {
+      return;
+    }
+    this.lastPublishedValues.set(topic, value);
+    publisher.pub(topic, value, false, false);
   }
 
   private setCrossWindMode(value: boolean) {

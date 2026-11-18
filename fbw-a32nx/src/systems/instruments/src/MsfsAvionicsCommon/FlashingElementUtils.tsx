@@ -59,14 +59,22 @@ export class FlashOneHertz extends DisplayComponent<FlashProps> {
     sub.on('ext_clock_delta_time').handle((dt) => {
       const visible = this.props.visible?.get() ?? true;
       const shouldFlash = this.props.flashing?.get() ?? true;
-      this.flashingMtrigResult.set(
-        this.props.flashDuration === Infinity
-          ? visible && shouldFlash
-          : this.flashingMtrig.write(visible && shouldFlash, dt),
-      );
+      const flashing = this.props.flashDuration === Infinity
+        ? visible && shouldFlash
+        : this.flashingMtrig.write(visible && shouldFlash, dt);
+
+      // Do not wake up the mapped subjects (and the DOM bindings behind them) when nothing changed. This runs at
+      // frame rate, so unconditionally setting it re-applied class names to the DOM every frame.
+      if (this.flashingMtrigResult.get() !== flashing) {
+        this.flashingMtrigResult.set(flashing);
+      }
     });
 
     this.class.sub((value) => {
+      if (value === this.prevClass) {
+        return;
+      }
+
       this.props.children.forEach((child) => {
         const classList = ((child as VNode).instance as HTMLElement).classList;
 

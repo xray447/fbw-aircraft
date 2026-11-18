@@ -34,7 +34,18 @@ export class HorizontalTape extends DisplayComponent<HorizontalTapeProps> {
 
   private yOffset = 0;
 
+  private lastTransform = '';
+
   private DeclutterSimVar = '';
+
+  private applyTransform(): void {
+    const transform = `translate3d(${this.tapeOffset}px, ${this.yOffset}px, 0px)`;
+    if (this.lastTransform === transform) {
+      return;
+    }
+    this.lastTransform = transform;
+    this.refElement.instance.style.transform = transform;
+  }
 
   private buildHorizonTicks(): { ticks: SVGPathElement[]; labels?: SVGTextElement[] } {
     const result = { ticks: [] as SVGPathElement[], labels: [] as SVGTextElement[] };
@@ -149,7 +160,7 @@ export class HorizontalTape extends DisplayComponent<HorizontalTapeProps> {
 
     this.props.yOffset?.sub((yOffset) => {
       this.yOffset = yOffset;
-      this.refElement.instance.style.transform = `translate3d(${this.tapeOffset}px, ${yOffset}px, 0px)`;
+      this.applyTransform();
     });
 
     sub
@@ -240,7 +251,7 @@ export class HorizontalTape extends DisplayComponent<HorizontalTapeProps> {
         }
         this.tapeOffset = tapeOffset;
 
-        this.refElement.instance.style.transform = `translate3d(${tapeOffset}px, ${this.yOffset}px, 0px)`;
+        this.applyTransform();
       });
   }
 

@@ -890,6 +890,8 @@ class DecelSpeedTrendArrow extends DisplayComponent<{
 
   private autoBrakeActive = false;
 
+  private lastVisibility = '';
+
   onAfterRender(node: VNode): void {
     super.onAfterRender(node);
 
@@ -911,9 +913,9 @@ class DecelSpeedTrendArrow extends DisplayComponent<{
       const targetSpeed = filteredAirspeedAcc * 10;
 
       if (!this.autoBrakeActive) {
-        this.refElement.instance.style.visibility = 'hidden';
+        this.setVisibility('hidden');
       } else {
-        this.refElement.instance.style.visibility = 'visible';
+        this.setVisibility('visible');
         let pathString;
 
         const offset = Math.min(
@@ -922,18 +924,32 @@ class DecelSpeedTrendArrow extends DisplayComponent<{
         );
         if (airspeedAcc < 0) {
           pathString = `m65.684  ${neutralPos + offset} l 5.326 -10.458 M 65.684 ${neutralPos + offset} l -5.326 -10.458`;
-          this.offset.set(`m65.684 ${neutralPos} v ${offset.toFixed(10)}`);
+          this.setString(this.offset, `m65.684 ${neutralPos} v ${offset.toFixed(10)}`);
         } else {
           pathString = '';
-          this.offset.set(`m65.684 ${neutralPos} v 0`);
+          this.setString(this.offset, `m65.684 ${neutralPos} v 0`);
         }
 
-        this.pathString.set(pathString);
+        this.setString(this.pathString, pathString);
 
-        this.decelArrowBase.set(`m57.184 ${neutralPos} h 17`);
-        this.decelArrowRange.set(`m57.184 514.25 h 17`);
+        this.setString(this.decelArrowBase, `m57.184 ${neutralPos} h 17`);
+        this.setString(this.decelArrowRange, `m57.184 514.25 h 17`);
       }
     });
+  }
+
+  private setVisibility(visibility: string): void {
+    if (this.lastVisibility === visibility) {
+      return;
+    }
+    this.lastVisibility = visibility;
+    this.refElement.instance.style.visibility = visibility;
+  }
+
+  private setString(subject: Subject<string>, value: string): void {
+    if (subject.get() !== value) {
+      subject.set(value);
+    }
   }
 
   render(): VNode | null {
@@ -975,6 +991,8 @@ class SpeedTrendArrow extends DisplayComponent<{
 
   private vCTrendHysteresis = false;
 
+  private lastVisibility = '';
+
   private handleVCTrend(): void {
     if (Math.abs(this.vCTrend.value) < 1) {
       this.vCTrendHysteresis = false;
@@ -983,9 +1001,9 @@ class SpeedTrendArrow extends DisplayComponent<{
     }
 
     if (!this.vCTrendHysteresis || !this.vCTrend.isNormalOperation()) {
-      this.refElement.instance.style.visibility = 'hidden';
+      this.setVisibility('hidden');
     } else {
-      this.refElement.instance.style.visibility = 'visible';
+      this.setVisibility('visible');
       let pathString;
       const sign = Math.sign(this.vCTrend.value);
 
@@ -1006,10 +1024,23 @@ class SpeedTrendArrow extends DisplayComponent<{
         pathString = '';
       }
 
-      this.offset.set(`m65.684 ${neutralPos}v${offset.toFixed(10)}`);
+      const basePath = `m65.684 ${neutralPos}v${offset.toFixed(10)}`;
+      if (this.offset.get() !== basePath) {
+        this.offset.set(basePath);
+      }
 
-      this.pathString.set(pathString);
+      if (this.pathString.get() !== pathString) {
+        this.pathString.set(pathString);
+      }
     }
+  }
+
+  private setVisibility(visibility: string): void {
+    if (this.lastVisibility === visibility) {
+      return;
+    }
+    this.lastVisibility = visibility;
+    this.refElement.instance.style.visibility = visibility;
   }
 
   onAfterRender(node: VNode): void {

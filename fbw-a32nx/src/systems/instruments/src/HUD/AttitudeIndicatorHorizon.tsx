@@ -121,10 +121,17 @@ export class Horizon extends DisplayComponent<HorizonProps> {
           }
           const yOffset = Math.max(Math.min(calculateHorizonOffsetFromPitch(pitch.value), 31.563), -31.563);
           this.yOffset.set(yOffset);
-          this.GroupRef.instance.style.clipPath = this.crosswindMode.get()
-            ? 'url(#cwPitchScaleMask)'
-            : 'url(#PitchScaleMask)';
         }),
+    );
+
+    // Only swap the clip path when the crosswind mode changes. Re-assigning the same style every frame invalidates
+    // the clip mask (which covers the whole pitch ladder) and forces Coherent GT to rebuild it.
+    this.subscriptions.push(
+      this.crosswindMode.sub((crosswindMode) => {
+        this.GroupRef.instance.style.clipPath = crosswindMode
+          ? 'url(#cwPitchScaleMask)'
+          : 'url(#PitchScaleMask)';
+      }, true),
     );
 
     this.subscriptions.push(
@@ -139,9 +146,6 @@ export class Horizon extends DisplayComponent<HorizonProps> {
           } else {
             this.rollGroupRef.instance.style.display = 'none';
           }
-          this.GroupRef.instance.style.clipPath = this.crosswindMode.get()
-            ? 'url(#cwPitchScaleMask)'
-            : 'url(#PitchScaleMask)';
         }),
     );
 
@@ -354,21 +358,29 @@ class SideslipIndicator extends DisplayComponent<SideslipIndicatorProps> {
     });
   }
 
+  private lastSlideSlipFailed: boolean | undefined = undefined;
+
+  private lastSlideSlipOffset = Number.NaN;
+
   private determineSlideSlip() {
     const multiplier = 100;
     let offset = 0;
 
     let betaTargetActive = false;
 
-    if (
+    const slideSlipFailed =
       (this.onGround && this.latAcc.isFailureWarning()) ||
-      (!this.onGround && this.latAcc.isFailureWarning() && this.beta.isFailureWarning())
-    ) {
-      this.slideSlip.instance.style.visibility = 'hidden';
-      this.siFailFlag.instance.style.display = 'block';
-    } else {
-      this.slideSlip.instance.style.visibility = 'visible';
-      this.siFailFlag.instance.style.display = 'none';
+      (!this.onGround && this.latAcc.isFailureWarning() && this.beta.isFailureWarning());
+
+    if (slideSlipFailed !== this.lastSlideSlipFailed) {
+      this.lastSlideSlipFailed = slideSlipFailed;
+      if (slideSlipFailed) {
+        this.slideSlip.instance.style.visibility = 'hidden';
+        this.siFailFlag.instance.style.display = 'block';
+      } else {
+        this.slideSlip.instance.style.visibility = 'visible';
+        this.siFailFlag.instance.style.display = 'none';
+      }
     }
 
     if (
@@ -386,8 +398,15 @@ class SideslipIndicator extends DisplayComponent<SideslipIndicatorProps> {
       offset = Math.round(((-accInG * 15) / 0.3) * multiplier) / multiplier;
     }
 
-    this.classNameSub.set(betaTargetActive ? 'Green Fill' : 'Green');
-    this.slideSlip.instance.style.transform = `translate3d(${offset}px, 0px, 0px)`;
+    const className = betaTargetActive ? 'Green Fill' : 'Green';
+    if (this.classNameSub.get() !== className) {
+      this.classNameSub.set(className);
+    }
+
+    if (this.lastSlideSlipOffset !== offset) {
+      this.lastSlideSlipOffset = offset;
+      this.slideSlip.instance.style.transform = `translate3d(${offset}px, 0px, 0px)`;
+    }
   }
 
   render(): VNode {

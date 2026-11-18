@@ -51,17 +51,27 @@ class RadioAltIndicator extends DisplayComponent<{ bus: ArincEventBus; filteredR
   private offsetSub = Subject.create('');
 
   private readonly radioaltitude = Arinc429ConsumerSubject.create(this.sub.on('chosenRa'));
+  private lastPath = '';
+
   private setOffset() {
     if (
       this.props.filteredRadioAltitude.get() > DisplayRange ||
       this.radioaltitude.get().isFailureWarning() ||
       this.radioaltitude.get().isNoComputedData()
     ) {
-      this.visibilitySub.set('hidden');
+      if (this.visibilitySub.get() !== 'hidden') {
+        this.visibilitySub.set('hidden');
+      }
     } else {
-      this.visibilitySub.set('visible');
+      if (this.visibilitySub.get() !== 'visible') {
+        this.visibilitySub.set('visible');
+      }
       const offset = ((this.props.filteredRadioAltitude.get() - DisplayRange) * DistanceSpacing) / ValueSpacing;
-      this.offsetSub.set(`m 557.388 525.13 h 12.201 v ${offset} h -12.201z`);
+      const path = `m 557.388 525.13 h 12.201 v ${offset} h -12.201z`;
+      if (this.lastPath !== path) {
+        this.lastPath = path;
+        this.offsetSub.set(path);
+      }
     }
   }
 
@@ -130,13 +140,20 @@ class MinimumDescentAltitudeIndicator extends DisplayComponent<{ bus: ArincEvent
       !this.mda.get().isNoComputedData();
 
     if (!showMda) {
-      this.visibility.set('hidden');
+      if (this.visibility.get() !== 'hidden') {
+        this.visibility.set('hidden');
+      }
       return;
     }
 
     const offset = (altDelta * DistanceSpacing) / ValueSpacing;
-    this.path.set(`m 543.692 ${neutralPos - offset} h 24.69 v 4.781 h -24.69 z`);
-    this.visibility.set('visible');
+    const path = `m 543.692 ${neutralPos - offset} h 24.69 v 4.781 h -24.69 z`;
+    if (this.path.get() !== path) {
+      this.path.set(path);
+    }
+    if (this.visibility.get() !== 'visible') {
+      this.visibility.set('visible');
+    }
   }
 
   onAfterRender(node: VNode): void {
@@ -581,7 +598,6 @@ class SelectedAltIndicator extends DisplayComponent<SelectedAltIndicatorProps> {
     this.altitude.sub(() => {
       this.handleAltitudeDisplay();
       this.getOffset();
-      this.handleCrosswinMode();
     }, true);
 
     this.sub.on('fmEisDiscreteWord2Raw').handle(this.fmEisDiscrete2.setWord.bind(this.fmEisDiscrete2));
@@ -608,7 +624,11 @@ class SelectedAltIndicator extends DisplayComponent<SelectedAltIndicatorProps> {
         } else {
           this.isMinLowerAltTxtVisible = 'none';
         }
-        this.minimumLowerText.instance.style.display = this.isMinLowerAltTxtVisible;
+
+        if (this.lastMinLowerTextDisplay !== this.isMinLowerAltTxtVisible) {
+          this.lastMinLowerTextDisplay = this.isMinLowerAltTxtVisible;
+          this.minimumLowerText.instance.style.display = this.isMinLowerAltTxtVisible;
+        }
       }
     });
 
@@ -635,31 +655,68 @@ class SelectedAltIndicator extends DisplayComponent<SelectedAltIndicatorProps> {
       this.handleAltitudeDisplay();
       this.setText();
     });
+
+    // Depends only on the (immutable) wind mode of this instance, so it only needs to run once.
+    this.handleCrosswinMode();
   }
 
+  private lastLowerDisplay = '';
+
+  private lastUpperDisplay = '';
+
+  private lastTargetDisplay = '';
+
+  private lastSelectedAltFailed: boolean | undefined = undefined;
+
+  private lastOffset = Number.NaN;
+
+  private lastBoxLength = -1;
+
+  private lastMinLowerTextDisplay = '';
+
   private handleAltitudeDisplay() {
+    let lowerDisplay: string;
+    let upperDisplay: string;
+    let targetDisplay: string;
+    let failed: boolean;
+
     if (this.shownTargetAltitude.isNoComputedData() || this.shownTargetAltitude.isFailureWarning()) {
-      this.selectedAltUpperGroupRef.instance.style.display = 'none';
-      this.selectedAltLowerGroupRef.instance.style.display = 'none';
-      this.targetGroupRef.instance.style.display = 'none';
-      this.selectedAltFailed.set(true);
+      lowerDisplay = 'none';
+      upperDisplay = 'none';
+      targetDisplay = 'none';
+      failed = true;
     } else if (this.altitude.get().value - this.shownTargetAltitude.value > DisplayRange) {
-      this.isMinLowerAltTxtVisible === 'block'
-        ? (this.selectedAltLowerGroupRef.instance.style.display = 'none')
-        : (this.selectedAltLowerGroupRef.instance.style.display = 'block');
-      this.selectedAltUpperGroupRef.instance.style.display = 'none';
-      this.targetGroupRef.instance.style.display = 'none';
-      this.selectedAltFailed.set(false);
+      lowerDisplay = this.isMinLowerAltTxtVisible === 'block' ? 'none' : 'block';
+      upperDisplay = 'none';
+      targetDisplay = 'none';
+      failed = false;
     } else if (this.altitude.get().value - this.shownTargetAltitude.value < -DisplayRange) {
-      this.targetGroupRef.instance.style.display = 'none';
-      this.selectedAltUpperGroupRef.instance.style.display = 'block';
-      this.selectedAltLowerGroupRef.instance.style.display = 'none';
-      this.selectedAltFailed.set(false);
+      lowerDisplay = 'none';
+      upperDisplay = 'block';
+      targetDisplay = 'none';
+      failed = false;
     } else {
-      this.selectedAltUpperGroupRef.instance.style.display = 'none';
-      this.selectedAltLowerGroupRef.instance.style.display = 'none';
-      this.targetGroupRef.instance.style.display = 'inline';
-      this.selectedAltFailed.set(false);
+      lowerDisplay = 'none';
+      upperDisplay = 'none';
+      targetDisplay = 'inline';
+      failed = false;
+    }
+
+    if (this.lastLowerDisplay !== lowerDisplay) {
+      this.lastLowerDisplay = lowerDisplay;
+      this.selectedAltLowerGroupRef.instance.style.display = lowerDisplay;
+    }
+    if (this.lastUpperDisplay !== upperDisplay) {
+      this.lastUpperDisplay = upperDisplay;
+      this.selectedAltUpperGroupRef.instance.style.display = upperDisplay;
+    }
+    if (this.lastTargetDisplay !== targetDisplay) {
+      this.lastTargetDisplay = targetDisplay;
+      this.targetGroupRef.instance.style.display = targetDisplay;
+    }
+    if (this.lastSelectedAltFailed !== failed) {
+      this.lastSelectedAltFailed = failed;
+      this.selectedAltFailed.set(failed);
     }
   }
 
@@ -674,13 +731,21 @@ class SelectedAltIndicator extends DisplayComponent<SelectedAltIndicatorProps> {
     } else {
       text = Math.round(this.shownTargetAltitude.value).toString().padStart(5, ' ');
     }
-    this.textSub.set(text);
-    this.blackFill.instance.setAttribute('d', `m500.438 330.582 h ${boxLength} v 25.702 h-${boxLength}z`);
+    if (this.textSub.get() !== text) {
+      this.textSub.set(text);
+    }
+    if (this.lastBoxLength !== boxLength) {
+      this.lastBoxLength = boxLength;
+      this.blackFill.instance.setAttribute('d', `m500.438 330.582 h ${boxLength} v 25.702 h-${boxLength}z`);
+    }
   }
 
   private getOffset() {
     const offset = ((this.altitude.get().value - this.shownTargetAltitude.value) * DistanceSpacing) / ValueSpacing;
-    this.targetGroupRef.instance.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+    if (this.lastOffset !== offset) {
+      this.lastOffset = offset;
+      this.targetGroupRef.instance.style.transform = `translate3d(0px, ${offset}px, 0px)`;
+    }
   }
 
   private handleCrosswinMode() {
@@ -870,29 +935,6 @@ class AltimeterIndicator extends DisplayComponent<AltimeterIndicatorProps> {
 
     this.subscriptions.push(
       this.sub
-        .on('fcuEisDiscreteWord1')
-        .whenChanged()
-        .handle((word) => {
-          this.baroInInhg = word.bitValueOr(11, false);
-
-          this.getText();
-        }),
-    );
-
-    this.subscriptions.push(
-      this.sub
-        .on('fcuEisDiscreteWord2')
-        .whenChanged()
-        .handle((word) => {
-          this.baroInStd = word.bitValueOr(28, false) || word.isFailureWarning();
-          this.baroInQnh = word.bitValueOr(29, false);
-
-          this.getText();
-        }),
-    );
-
-    this.subscriptions.push(
-      this.sub
         .on('fmgcFlightPhase')
         .whenChanged()
         .handle((fp) => {
@@ -951,25 +993,23 @@ class AltimeterIndicator extends DisplayComponent<AltimeterIndicatorProps> {
     });
   }
 
+  private lastShouldFlash: boolean | undefined = undefined;
+
   private handleBlink() {
+    let shouldFlash = false;
+
     if (this.mode.get() === 'STD') {
-      if (
+      shouldFlash =
         this.flightPhase > 3 &&
         this.transLvlAr.isNormalOperation() &&
-        100 * this.transLvlAr.value > this.props.altitude.get()
-      ) {
-        this.shouldFlash.set(true);
-      } else {
-        this.shouldFlash.set(false);
-      }
-    } else if (
-      this.flightPhase <= 3 &&
-      this.transAltAr.isNormalOperation() &&
-      this.transAltAr.value < this.props.altitude.get()
-    ) {
-      this.shouldFlash.set(true);
-    } else {
-      this.shouldFlash.set(false);
+        100 * this.transLvlAr.value > this.props.altitude.get();
+    } else if (this.flightPhase <= 3 && this.transAltAr.isNormalOperation()) {
+      shouldFlash = this.transAltAr.value < this.props.altitude.get();
+    }
+
+    if (this.lastShouldFlash !== shouldFlash) {
+      this.lastShouldFlash = shouldFlash;
+      this.shouldFlash.set(shouldFlash);
     }
   }
 
@@ -1162,13 +1202,30 @@ class MetricAltIndicator extends DisplayComponent<MetricAltIndicatorProps> {
     this.subscriptions.push(this.sub.on('realTime').handle(this.updateState.bind(this)));
   }
 
+  private lastAltitudeColor: TargetAltitudeColor | undefined = undefined;
+
+  private lastDisplay = '';
+
   private updateAltitudeColor() {
+    if (this.lastAltitudeColor === this.state.altitudeColor) {
+      return;
+    }
+    this.lastAltitudeColor = this.state.altitudeColor;
+
     this.metricAltTargetText.instance.classList.toggle('Cyan', this.state.altitudeColor === TargetAltitudeColor.Cyan);
     this.metricAltTargetText.instance.classList.toggle(
       'Magenta',
       this.state.altitudeColor === TargetAltitudeColor.Magenta,
     );
     this.metricAltTargetText.instance.classList.toggle('White', this.state.altitudeColor === TargetAltitudeColor.White);
+  }
+
+  private setDisplay(display: string): void {
+    if (this.lastDisplay === display) {
+      return;
+    }
+    this.lastDisplay = display;
+    this.metricAltRef.instance.style.display = display;
   }
 
   private updateState(_time: number) {
@@ -1180,29 +1237,26 @@ class MetricAltIndicator extends DisplayComponent<MetricAltIndicatorProps> {
         !this.state.targetAlt.isNoComputedData();
       if (showMetricAlt) {
         if (this.metricAlt.get()) {
-          this.metricAltRef.instance.style.display = 'inline';
+          this.setDisplay('inline');
+
           const currentMetricAlt = Math.round((this.altitude.get().value * 0.3048) / 10) * 10;
-          this.metricAltText.instance.textContent = currentMetricAlt.toString();
+          const currentMetricAltText = currentMetricAlt.toString();
+          if (this.metricAltText.instance.textContent !== currentMetricAltText) {
+            this.metricAltText.instance.textContent = currentMetricAltText;
+          }
 
           const targetMetric = Math.round((this.state.targetAlt.value * 0.3048) / 10) * 10;
-          this.metricAltTargetText.instance.textContent = targetMetric.toString();
+          const targetMetricText = targetMetric.toString();
+          if (this.metricAltTargetText.instance.textContent !== targetMetricText) {
+            this.metricAltTargetText.instance.textContent = targetMetricText;
+          }
 
           this.updateAltitudeColor();
-
-          if (
-            !this.mda.get().isNoComputedData() &&
-            !this.mda.get().isFailureWarning() &&
-            this.altitude.get().value < this.mda.get().value
-          ) {
-            this.metricAltText.instance.classList.replace('Green', 'Green');
-          } else {
-            this.metricAltText.instance.classList.replace('Green', 'Green');
-          }
         } else {
-          this.metricAltRef.instance.style.display = 'none';
+          this.setDisplay('none');
         }
       } else {
-        this.metricAltRef.instance.style.display = 'none';
+        this.setDisplay('none');
       }
     }
   }
